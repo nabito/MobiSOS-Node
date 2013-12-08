@@ -42,6 +42,7 @@ app.delete('/users/:id', ctrl.deleteUser);
 
 // SOS functions
 app.get('/soscall/:id', ctrl.sosCall);
+app.post('/wifi.checkin', ctrl.wifiCheckin);
 
 
 

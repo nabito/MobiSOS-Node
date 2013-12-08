@@ -6,6 +6,8 @@ var java = require("java");
 java.classpath.push("commons-lang3-3.1.jar");
 java.classpath.push("commons-io.jar");
 
+java.classpath.push("/Users/Wirawit/eclipseWorkspace/MobiSOS-Core/MobiSOS-Core.jar");
+
 
 
 // Start Mongo server and init DB
@@ -202,17 +204,19 @@ exports.deleteUser = function(req, res) {
 
 exports.sosCall = function(req, res) {
 	
-	var uID = req.params.id;
+	var uid = req.params.id;
+	var loc = req.params.loc;
 	
-	
+	/*
 	var ArrayList = java.import('java.util.ArrayList');
 	var list = new ArrayList();
 	list.addSync('item1');
 	
 	console.log(list.getSync(0));		
+	*/
 	
-	
-	// TODO call Java to query semantic DB for nearby nodes
+	// TODO update latest location to DB and start real-time tracking mode
+	// Let the server call Java to query semantic DB for nearby nodes
 	// then ask for tracking record "Do you see Bob?"
 	
 	// return acknowledge that the SOS request is properly received
@@ -220,6 +224,45 @@ exports.sosCall = function(req, res) {
 	
 	//res.send({id:req.params.id, name: 'Anyname', desc: 'Desc', more:'more' });
 	console.log('got called!');
+};
+
+exports.wifiCheckin = function(req, res) {
+		
+	console.log(req.body);
+	
+	var uid = req.body.uid;
+	var loc = JSON.parse(req.body.loc);
+	var mac = req.body.mac;	
+	
+	console.log('my fake id is ' + uid);
+	console.log('my timestamp is ' + loc.timestamp);
+	
+	// Java class definition here
+	var MobiSosCore = java.import('com.dadfha.mobisos.MobiSosCore');
+	
+	var core = new MobiSosCore();
+	
+	// FIXME user registration should be done else where
+	var user = core.createUserSync('nabito@gmail.com', 'pwd');
+	var realUid = user.getPropertySync(core.PROP_UUID).getStringSync();
+	console.log('realUID is ' + realUid);
+	
+	var chkResult = false;
+	
+	try {
+		chkResult = core.checkInWifiSync(realUid, JSON.stringify(loc), mac);
+	} catch(ex) {
+		console.log(ex.printStackTrace());
+	}
+		
+	if(chkResult) {
+		res.send('ack');
+		console.log('user ' + uid + ' succeed wifi check-in at timestamp ' + loc.timestamp);
+	} else {
+		res.send('nak');
+		console.log('user ' + uid + ' failed wifi check-in at timestamp ' + loc.timestamp);
+	}	
+	
 };
 
 

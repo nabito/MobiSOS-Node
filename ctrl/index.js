@@ -1,12 +1,55 @@
+/**
+ * Global namespace & imports
+ */
+var jvm = {};
+jvm.java = require("java");
+//var amqp = require('amqp');
+
+// IMP do we really have to care? coz, it's already in commonJS module concept where global namespace won't be polluted
 
 /**
- * import section
+ * Initialization
  */
+// JVM configuration
+jvm.java.classpath.push("commons-lang3-3.1.jar");
+jvm.java.classpath.push("commons-io.jar");
+jvm.java.classpath.push("/Users/Wirawit/eclipseWorkspace/MobiSOS-Core/MobiSOS-Core.jar");
+
+// Java class definitions
+jvm.MobiSosCore = jvm.java.import('com.dadfha.mobisos.MobiSosCore');
+// Java objects
+jvm.mbsCore = new jvm.MobiSosCore();
+
+//var amqpCon = amqp.createConnection({host: 'localhost', port: 5672});
+
+/**
+ * Event Handler Functions
+ */
+
+/*
+//AMQP handling
+amqpCon.addListener('ready', function () {
+    console.log('connected to ' + amqpCon.serverProperties.product);
+    amqpCon.queue('java2nodeQueue', function(q) {
+    	q.bind('#');
+    	q.subscribe(function (m) {
+            console.log(m.data.toString());     
+        });    	
+    });
+});
+*/
+
+
+/*
 var java = require("java");
 java.classpath.push("commons-lang3-3.1.jar");
 java.classpath.push("commons-io.jar");
 
 java.classpath.push("/Users/Wirawit/eclipseWorkspace/MobiSOS-Core/MobiSOS-Core.jar");
+
+// Java class definition here
+var MobiSosCore = java.import('com.dadfha.mobisos.MobiSosCore');
+*/
 
 
 
@@ -66,6 +109,9 @@ var populateDB = function() {
 
 
 // Here is Mongoose for app specific DB
+// Temporarily commented out for now (When to use MongoDB in MobiSOS? TBD)
+
+/*
 
 var mongoose = require('mongoose');
 mongoose.connect('mongodb://localhost/location');
@@ -117,15 +163,13 @@ var initLocationDB = function() {
 };
 
 
-
+*/
 
 
 
 /**
- * Controller
+ * Controller Exported Functions/Variables
  */
-
-
 
 exports.hello = function(req, res) {
 	var body = 'Hello Worldooooo';	
@@ -204,53 +248,55 @@ exports.deleteUser = function(req, res) {
 
 exports.sosCall = function(req, res) {
 	
-	var uid = req.params.id;
-	var loc = req.params.loc;
+	//console.log(req.body);
 	
-	/*
-	var ArrayList = java.import('java.util.ArrayList');
-	var list = new ArrayList();
-	list.addSync('item1');
+	var uid = req.body.uid;	// uid here, should uniquely identify a device for a user
+	var loc = JSON.parse(req.body.loc);
 	
-	console.log(list.getSync(0));		
-	*/
+	var statusVal = 'ack';
+	var errMsgVal = '';
 	
-	// TODO update latest location to DB and start real-time tracking mode
-	// Let the server call Java to query semantic DB for nearby nodes
-	// then ask for tracking record "Do you see Bob?"
-	
-	// return acknowledge that the SOS request is properly received
-	res.send('ack');
+	// relay sos call to backend
+	try {
+		jvm.mbsCore.sosCall(uid, loc);	
+	} catch(ex) {
+		statusVal = 'nak';
+		errMsgVal = ex.getMessageSync();
+		console.log(ex.printStackTrace());
+	}
+
+	// if succeed, return acknowledge that the SOS request is properly received
+	var reply = { 
+			status: statusVal,
+			errMsg: errMsgVal
+	};
+	res.send(reply);
 	
 	//res.send({id:req.params.id, name: 'Anyname', desc: 'Desc', more:'more' });
-	console.log('got called!');
+	console.log('sos called with uid: ' + uid + ' location ' + JSON.stringify(loc));
 };
 
 exports.wifiCheckin = function(req, res) {
 		
-	console.log(req.body);
+	//console.log(req.body);
 	
 	var uid = req.body.uid;
 	var loc = JSON.parse(req.body.loc);
-	var mac = req.body.mac;	
+	var mac = req.body.mac;		// MAC address of wifi router
 	
 	console.log('my fake id is ' + uid);
 	console.log('my timestamp is ' + loc.timestamp);
-	
-	// Java class definition here
-	var MobiSosCore = java.import('com.dadfha.mobisos.MobiSosCore');
-	
-	var core = new MobiSosCore();
+
 	
 	// FIXME user registration should be done else where
-	var user = core.createUserSync('nabito@gmail.com', 'pwd');
-	var realUid = user.getPropertySync(core.PROP_UUID).getStringSync();
+	var user = jvm.mbsCore.createUserSync('nabito@gmail.com', 'pwd');
+	var realUid = user.getPropertySync(jvm.mbsCore.PROP_UUID).getStringSync();
 	console.log('realUID is ' + realUid);
 	
 	var chkResult = false;
 	
 	try {
-		chkResult = core.checkInWifiSync(realUid, JSON.stringify(loc), mac);
+		chkResult = jvm.mbsCore.checkInWifiSync(realUid, JSON.stringify(loc), mac);
 	} catch(ex) {
 		console.log(ex.printStackTrace());
 	}
@@ -261,7 +307,7 @@ exports.wifiCheckin = function(req, res) {
 	} else {
 		res.send('nak');
 		console.log('user ' + uid + ' failed wifi check-in at timestamp ' + loc.timestamp);
-	}	
+	}
 	
 };
 

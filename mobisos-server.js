@@ -10,24 +10,29 @@ console.log('Server running at http://127.0.0.1:1337/');
 
 
 /**
- * import section
+ * Global namespace & imports
  */
 var express = require('express');
 var ctrl = require('./ctrl/index');
 
-
+var NODE_HTTP_PORT = 1337;
 var app = express();
+
+/**
+ * Main program section
+ */
 
 app.configure(function () {
     app.use(express.logger('dev'));     /* 'default', 'short', 'tiny', 'dev' */
     app.use(express.bodyParser());
 });
 
+
 /**
  * route definitions
  */
 
-// User Resource
+// RESTful Resources
 app.get('/hello', ctrl.hello);
 
 app.get('/users', ctrl.findAll);
@@ -41,11 +46,12 @@ app.put('/users/:id', ctrl.updateUser);
 app.delete('/users/:id', ctrl.deleteUser);
 
 // SOS functions
-app.get('/soscall/:id', ctrl.sosCall);
+app.post('/soscall', ctrl.sosCall);
 app.post('/wifi.checkin', ctrl.wifiCheckin);
 
 
+// Starting the server
+app.listen(NODE_HTTP_PORT);
+console.log('Node.js HTTP Server started at PORT:' + NODE_HTTP_PORT + '...');
 
 
-app.listen(1337);
-console.log('Listening 1337');

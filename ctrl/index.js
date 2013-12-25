@@ -289,8 +289,9 @@ exports.wifiCheckin = function(req, res) {
 
 	
 	// FIXME user registration should be done else where
-	var user = jvm.mbsCore.createUserSync('nabito@gmail.com', 'pwd');
-	var realUid = user.getPropertySync(jvm.mbsCore.PROP_UUID).getStringSync();
+	var realUid = jvm.mbsCore.createUserSync('nabito@gmail.com', 'pwd');
+	//var user = jvm.mbsCore.createUserSync('nabito@gmail.com', 'pwd');
+	//var realUid = user.getPropertySync(jvm.java.getStaticFieldValue('com.dadfha.mobisos.MobiSosCore', 'PROP_UUID')).getStringSync();
 	console.log('realUID is ' + realUid);
 	
 	var chkResult = false;
@@ -308,6 +309,7 @@ exports.wifiCheckin = function(req, res) {
 		res.send('nak');
 		console.log('user ' + uid + ' failed wifi check-in at timestamp ' + loc.timestamp);
 	}
+	
 	
 };
 

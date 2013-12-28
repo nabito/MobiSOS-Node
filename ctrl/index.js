@@ -196,7 +196,7 @@ exports.findById = function(req, res) {
         });
     });	
 };
-
+/*
 exports.addUser = function(req, res) {
     var user = req.body;
     console.log('Adding user: ' + JSON.stringify(user));
@@ -210,6 +210,34 @@ exports.addUser = function(req, res) {
             }
         });
     });
+};
+*/
+exports.addUser = function(req, res) {
+	// TODO add another level of security by generating officially issued temporary token so no other people can randomly call this API
+	var email = req.body.email;
+	var passwd = req.body.passwd;
+	var udid = req.body.udid; // should uniquely identify a device for a user
+	
+	var statusVal = 'ack';
+	var errMsgVal = '';
+
+	var uuid = jvm.mbsCore.createUserSync(email, passwd, udid);
+	
+	if(!uuid) {		
+		statusVal = 'nak';
+		errMsgVal = 'failed to register user.';
+		console.log('Error: cannot create user of email ' + email + ' and udid ' + udid);
+	} else {
+		console.log('user ' + email + ' created with uuid: ' + uuid);
+	}
+
+	var reply = { 
+			status: statusVal,
+			uuid: uuid,			
+			errMsg: errMsgVal
+	};
+	res.send(reply);
+	
 };
 
 exports.updateUser = function(req, res) {
@@ -250,7 +278,8 @@ exports.sosCall = function(req, res) {
 	
 	//console.log(req.body);
 	
-	var uid = req.body.uid;	// uid here, should uniquely identify a device for a user
+	var uid = req.body.uid;	
+	var udid = req.body.udid; // should uniquely identify a device for a user
 	var loc = JSON.parse(req.body.loc);
 	
 	var statusVal = 'ack';
@@ -258,11 +287,12 @@ exports.sosCall = function(req, res) {
 	
 	// relay sos call to backend
 	try {
-		jvm.mbsCore.sosCall(uid, loc);	
+		jvm.mbsCore.sosCallSync(uid, udid, loc);	
 	} catch(ex) {
 		statusVal = 'nak';
-		errMsgVal = ex.getMessageSync();
-		console.log(ex.printStackTrace());
+		errMsgVal = 'sos call failed. please try again.';
+		console.log(ex.cause.getMessageSync());
+		console.log(ex.cause.printStackTraceSync());
 	}
 
 	// if succeed, return acknowledge that the SOS request is properly received
@@ -280,36 +310,29 @@ exports.wifiCheckin = function(req, res) {
 		
 	//console.log(req.body);
 	
-	var uid = req.body.uid;
+	var uuid = req.body.uuid;
 	var loc = JSON.parse(req.body.loc);
 	var mac = req.body.mac;		// MAC address of wifi router
 	
-	console.log('my fake id is ' + uid);
-	console.log('my timestamp is ' + loc.timestamp);
-
-	
-	// FIXME user registration should be done else where
-	var realUid = jvm.mbsCore.createUserSync('nabito@gmail.com', 'pwd');
-	//var user = jvm.mbsCore.createUserSync('nabito@gmail.com', 'pwd');
-	//var realUid = user.getPropertySync(jvm.java.getStaticFieldValue('com.dadfha.mobisos.MobiSosCore', 'PROP_UUID')).getStringSync();
-	console.log('realUID is ' + realUid);
-	
-	var chkResult = false;
-	
+	var statusVal = 'ack';
+	var errMsgVal = '';	
+			
 	try {
-		chkResult = jvm.mbsCore.checkInWifiSync(realUid, JSON.stringify(loc), mac);
+		chkResult = jvm.mbsCore.checkInWifiSync(uuid, JSON.stringify(loc), mac);
 	} catch(ex) {
-		console.log(ex.printStackTrace());
+		statusVal = 'nak';
+		errMsgVal = 'user ' + uuid + ' failed wifi check-in at timestamp ' + loc.timestamp;		
+		console.log(ex.cause.getMessageSync());
+		console.log(ex.cause.printStackTraceSync());
 	}
-		
-	if(chkResult) {
-		res.send('ack');
-		console.log('user ' + uid + ' succeed wifi check-in at timestamp ' + loc.timestamp);
-	} else {
-		res.send('nak');
-		console.log('user ' + uid + ' failed wifi check-in at timestamp ' + loc.timestamp);
-	}
+
+	var reply = { 
+			status: statusVal,
+			errMsg: errMsgVal
+	};
+	res.send(reply);
 	
+	console.log('user ' + uuid + ' succeed wifi check-in at timestamp ' + loc.timestamp);
 	
 };
 

@@ -332,7 +332,7 @@ exports.wifiCheckin = function(req, res) {
 	};
 	res.send(reply);
 	
-	console.log('user ' + uuid + ' succeed wifi check-in at timestamp ' + loc.timestamp);
+	console.log('user ' + uuid + ' succeed wifi check-in at lat:' + loc.latitude + ' lon: ' + loc.longitude + ' timestamp ' + loc.timestamp);
 	
 };
 

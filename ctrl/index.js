@@ -4,6 +4,7 @@
 var jvm = {};
 jvm.java = require("java");
 //var amqp = require('amqp');
+var io = null;
 
 // IMP do we really have to care? coz, it's already in commonJS module concept where global namespace won't be polluted
 
@@ -13,7 +14,7 @@ jvm.java = require("java");
 // JVM configuration
 jvm.java.classpath.push("commons-lang3-3.1.jar");
 jvm.java.classpath.push("commons-io.jar");
-jvm.java.classpath.push("/Users/Wirawit/eclipseWorkspace/MobiSOS-Core/MobiSOS-Core.jar");
+jvm.java.classpath.push("/Users/Wirawit/eclipseMarsWorkspace/MobiSOS-Core/MobiSOS-Core.jar");
 
 // Java class definitions
 jvm.MobiSosCore = jvm.java.import('com.dadfha.mobisos.MobiSosCore');
@@ -38,19 +39,6 @@ amqpCon.addListener('ready', function () {
     });
 });
 */
-
-
-/*
-var java = require("java");
-java.classpath.push("commons-lang3-3.1.jar");
-java.classpath.push("commons-io.jar");
-
-java.classpath.push("/Users/Wirawit/eclipseWorkspace/MobiSOS-Core/MobiSOS-Core.jar");
-
-// Java class definition here
-var MobiSosCore = java.import('com.dadfha.mobisos.MobiSosCore');
-*/
-
 
 
 // Start Mongo server and init DB
@@ -171,6 +159,10 @@ var initLocationDB = function() {
  * Controller Exported Functions/Variables
  */
 
+exports.setSocketIo = function(ioObj) {
+	io = ioObj;
+};
+
 exports.hello = function(req, res) {
 	var body = 'Hello Worldooooo';	
 	res.setHeader('Content-Type', 'text/plain');
@@ -276,39 +268,42 @@ exports.deleteUser = function(req, res) {
 
 exports.sosCall = function(req, res) {
 	
-	//console.log(req.body);
-	
-	var uid = req.body.uid;	
+	// TODO authenticate SOS call
+	var uuid = req.body.uuid;	
 	var udid = req.body.udid; // should uniquely identify a device for a user
 	var loc = JSON.parse(req.body.loc);
 	
-	var statusVal = 'ack';
-	var errMsgVal = '';
+	var statusVal = 'nak';
+	var errMsgVal = 'sos call failed. please try again.';
 	
 	// relay sos call to backend
 	try {
-		jvm.mbsCore.sosCallSync(uid, udid, loc);	
+		// jvm.mbsCore.sosCallSync(uuid, udid, loc);
+		jvm.mbsCore.sosCall(uuid, udid, loc, function(err, result) {
+			if(err) { 
+				console.error(err);		
+			} else {
+				statusVal = 'ack';
+				errMsgVal = null;				
+				console.log('sos called with uuid: ' + uuid + ' location ' + JSON.stringify(loc));
+			}
+			// if succeed, return acknowledge that the SOS request is properly received
+			var reply = { 
+				status: statusVal,
+				errMsg: errMsgVal
+			};
+			res.send(reply);			
+		});		
 	} catch(ex) {
-		statusVal = 'nak';
-		errMsgVal = 'sos call failed. please try again.';
-		console.log(ex.cause.getMessageSync());
-		console.log(ex.cause.printStackTraceSync());
+		console.error(ex.cause.getMessageSync());
+		console.error(ex.cause.printStackTraceSync());
 	}
-
-	// if succeed, return acknowledge that the SOS request is properly received
-	var reply = { 
-			status: statusVal,
-			errMsg: errMsgVal
-	};
-	res.send(reply);
 	
-	//res.send({id:req.params.id, name: 'Anyname', desc: 'Desc', more:'more' });
-	console.log('sos called with uid: ' + uid + ' location ' + JSON.stringify(loc));
 };
 
 exports.wifiCheckin = function(req, res) {
 		
-	//console.log(req.body);
+	// TODO authenticate checkin
 	
 	var uuid = req.body.uuid;
 	var loc = JSON.parse(req.body.loc);
@@ -318,7 +313,7 @@ exports.wifiCheckin = function(req, res) {
 	var errMsgVal = '';	
 			
 	try {
-		chkResult = jvm.mbsCore.checkInWifiSync(uuid, JSON.stringify(loc), mac);
+		chkResult = jvm.mbsCore.checkinWifiSync(uuid, JSON.stringify(loc), mac);
 	} catch(ex) {
 		statusVal = 'nak';
 		errMsgVal = 'user ' + uuid + ' failed wifi check-in at timestamp ' + loc.timestamp;		
@@ -337,5 +332,126 @@ exports.wifiCheckin = function(req, res) {
 };
 
 
+exports.tagCheckin = function(req, res) {
+	
+	// TODO security checkin
+	
+	var uuid = req.body.uuid;
+	var ucode = req.body.ucode;		// ucode of read tag
+	
+	var statusVal = 'ack';
+	var errMsgVal = '';	
+			
+	try {
+		chkResult = jvm.mbsCore.checkinTagSync(uuid, ucode);
+	} catch(ex) {
+		statusVal = 'nak';
+		errMsgVal = 'user ' + uuid + ' failed tag check-in at ' + new Date();		
+		console.log(ex.cause.getMessageSync());
+		console.log(ex.cause.printStackTraceSync());
+	}
+
+	var reply = { 
+			status: statusVal,
+			errMsg: errMsgVal
+	};
+	res.send(reply);
+	
+	console.log('user ' + uuid + ' succeed tag: ' + ucode + ' check-in at ' + new Date());
+	
+};
+
+
+
+exports.checkin = function(req, res) {
+	
+	// TODO add another level of checkin authentication	
+	var uuid = req.body.uuid;
+	var loc = JSON.parse(req.body.loc);
+	
+	console.log('User ' + uuid + ' attemp check-in at lat:' + loc.latitude + ' lon: ' + loc.longitude + ' timestamp ' + loc.timestamp);
+	
+	var statusVal = 'ack';
+	var errMsgVal = '';	
+			
+	try {
+		chkResult = jvm.mbsCore.checkinSync(uuid, JSON.stringify(loc));
+		console.log('Succeed check-in.');
+	} catch(ex) {
+		statusVal = 'nak';
+		errMsgVal = 'User ' + uuid + ' failed check-in at timestamp ' + loc.timestamp;		
+		console.log(ex.cause.getMessageSync());
+		console.log(ex.cause.printStackTraceSync());
+	}
+
+	var reply = { 
+			status: statusVal,
+			errMsg: errMsgVal
+	};
+	res.send(reply);
+	
+};
+
+exports.getCheckin = function(req, res) {
+	// TODO add another level security protection so no one can randomly get checkin records
+	var uuid = req.params.uuid, from = jvm.java.newInstanceSync(
+			"java.lang.Long", req.params.from), until = jvm.java
+			.newInstanceSync("java.lang.Long", req.params.until);
+
+	console.log('Attemp getting check-in record for user ' + uuid + ' from ' + from + ' until ' + until);
+
+	var statusVal = 'nak';
+	var errMsgVal = 'Cannot get checkin record for user ' + uuid;
+
+
+	jvm.mbsCore.getCheckinJson(uuid, from, until, function(err, result) {
+		if (err) {
+			console.error(err);
+		} else {
+			//console.log('Returned result from java.getCheckinJson(): ' + result);
+			statusVal = 'ack';
+			errMsgVal = null;
+			console.log('Succeed getting checkin record');
+		}
+		
+		var reply = {
+				status : statusVal,
+				checkins : result,
+				errMsg : errMsgVal
+			};
+		res.send(reply);
+	});
+
+};
+
+
+exports.tracking = function(req, res) {
+	var uuid = req.body.uuid
+	, udid = req.body.udid
+	, loc = JSON.parse(req.body.loc);
+	// TODO if no location supplied, infer location from udid
+	io.sockets.emit('newCheckin', { location: loc });
+};
+
+
+
+
+
+function semanticQuery(serviceType, expectedData, expectedOutput) {}
+
+var expectedData = {
+	data : [ {
+	latitude : "@w3c:latitude", 
+	longitude : "@w3c:longitude",
+	timestamp : "@xsd:datetime",
+	images : {
+		url : "@w3c:uri",
+		width : "@img:width",
+		height : "@img: height"
+			} 
+	}
+	// ...
+	]
+};
 
 
